@@ -1,0 +1,45 @@
+// contains wrappers for sensor-server <-> display device communication
+
+syntax = "proto3";
+package naki3d.common.protocol;
+
+import "proto_files/cec.proto";
+import "proto_files/discovery.proto";
+import "proto_files/types.proto";
+
+import "google/protobuf/empty.proto";
+
+// RasPi -> Device
+// Message wrapper, same as above.
+message SensorDataMessage {
+    string path = 1;
+    uint64 timestamp = 2; // Microseconds since startup (Camera timing is in microseconds, may as well keep it)
+
+    oneof data {
+        google.protobuf.Empty void = 16;
+        bool bool = 17;
+        int32 integer = 18;
+        float float = 19;
+        string string = 20;
+
+        Vector2Data vector2 = 21;
+        Vector3Data vector3 = 22;
+    }
+}
+
+message SensorMessage {
+    oneof message {
+        SensorDataMessage data = 1;
+        SensorDescriptor descriptor = 2;
+    }
+}
+
+// Device -> RasPi
+// Message wrapper, same as above.
+message SensorControlMessage {
+    string hostname = 1;
+    // 2 through 15 reserved
+    oneof message {
+        CECMessage cec_message = 17;
+    }
+}

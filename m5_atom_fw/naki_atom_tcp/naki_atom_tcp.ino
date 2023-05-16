@@ -5,7 +5,7 @@
 #include "pb_common.h"
 #include "pb.h"
 #include "pb_encode.h"
-#include "src/naki_sensor.pb.h"
+#include "proto_files/sensors.pb.h"
 
 #include <FastLED.h>
 #include <Ethernet.h>
@@ -76,11 +76,31 @@ void setup() {
   Serial.println(SS);
 }
 
+bool encode_string(pb_ostream_t* stream, const pb_field_t* field, void* const* arg)
+{
+    const char* str = (const char*)(*arg);
+
+    if (!pb_encode_tag_for_field(stream, field))
+        return false;
+
+    return pb_encode_string(stream, (uint8_t*)str, strlen(str));
+}
+
 void sendSensorList()
 {
-  naki3d_common_protocol_SensorList message = naki3d_common_protocol_SensorList_init_zero;
+  naki3d_common_protocol_SensorDescriptor descriptor = naki3d_common_protocol_SensorDescriptor_init_zero;
   pb_ostream_t stream = pb_ostream_from_buffer(pbMessageBuffer, sizeof(pbMessageBuffer));
-  bool status = pb_encode(&stream, naki3d_common_protocol_SensorList_fields, &message);
+
+  descriptor.path.arg = "pir/presence";
+  descriptor.path.funcs.encode = &encode_string;
+  descriptor.model.arg = "esp32";
+  descriptor.model.funcs.encode = &encode_string;
+  descriptor.data_type = naki3d_common_protocol_DataType_Float;
+
+  naki3d_common_protocol_SensorMessage message = naki3d_common_protocol_SensorMessage_init_zero;
+  message.descriptor = descriptor;
+  
+  bool status = pb_encode(&stream, naki3d_common_protocol_SensorMessage_fields, &message);
 
   // Blink to show network traffic
   leds[0] = CRGB::Purple;
@@ -98,18 +118,16 @@ void sendMovementSensorMessage(boolean movementDetected)
 {
   Serial.println("Sending Message");
   naki3d_common_protocol_SensorMessage message = naki3d_common_protocol_SensorMessage_init_zero;
-  
-  if (movementDetected) {
-    message.data.pir_movement.event = naki3d_common_protocol_PirMovementEvent_MOVEMENT_STARTED;
-  } else {
-    message.data.pir_movement.event = naki3d_common_protocol_PirMovementEvent_MOVEMENT_STOPPED;
-  }
-  
-  message.which_data = naki3d_common_protocol_SensorMessage_pir_movement_tag;
-  message.timestamp = micros();
-  strcpy(message.sensor_id, sensor_id);
-  
   pb_ostream_t stream = pb_ostream_from_buffer(pbMessageBuffer, sizeof(pbMessageBuffer));
+
+  naki3d_common_protocol_SensorDataMessage dataMessage = naki3d_common_protocol_SensorDataMessage_init_zero;
+  dataMessage.path.arg = "pir/presence";
+  dataMessage.path.funcs.encode = &encode_string;
+  dataMessage.timestamp = micros();
+  dataMessage.bool = movementDetected;
+
+  message.data = dataMessage;
+  
   bool status = pb_encode_ex(&stream, naki3d_common_protocol_SensorMessage_fields, &message, PB_ENCODE_DELIMITED);
 
   // Blink to show network traffic
@@ -131,7 +149,7 @@ void loop() {
     leds[0] = CRGB::Green;
     //fill_solid(leds, NUM_LEDS, CRGB::Green);
     FastLED.show();
-    //sendSensorList();
+    sendSensorList();
   } else {
     Serial.println("connection failed");
     leds[0] = CRGB::Red;

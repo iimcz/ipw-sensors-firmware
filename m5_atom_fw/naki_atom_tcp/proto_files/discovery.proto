@@ -1,0 +1,25 @@
+syntax = "proto3";
+package naki3d.common.protocol;
+
+message AvailableSensors {
+    repeated SensorDescriptor sensors = 1;
+}
+
+message SensorDescriptor {
+    string path = 1;
+    string model = 2;
+    DataType data_type = 3;
+}
+
+enum DataType {
+    // Bindable
+    Void = 0;
+    Bool = 1;
+    Integer = 2;
+    Float = 3;
+    String = 4;
+
+    // Passthrough
+    Vector2 = 5;
+    Vector3 = 6;
+}
